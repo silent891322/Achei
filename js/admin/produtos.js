@@ -1,554 +1,266 @@
-// Aba "Produtos" do painel — cadastro, edição, status e exclusão
-import { db } from "../firebase.js";
+// Página do produto (/p/{codigo}) — desenha a página a partir dos dados entregues pela função
 import {
-  ref, onValue, push, get, update, runTransaction
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-import { toast, carregandoBotao } from "./ui.js";
-import { processarFoto, MAX_FOTOS } from "./imagens.js";
-
-export const ESTADOS = {
-  novo: "Novo (nunca usado)",
-  seminovo: "Seminovo",
-  bom: "Usado — bom estado",
-  marcas: "Usado — com marcas de uso",
-  pecas: "Com defeito / para peças"
-};
-
-export const STATUS = {
-  disponivel: "Disponível",
-  reservado: "Reservado",
-  vendido: "Vendido"
-};
+  lerDB, paraLista, cardProduto, formatarPreco, esc, nomeLojaHTML, urlFoto,
+  linkWhatsapp, mensagemProduto, registrarMetrica, aviso, ESTADOS, ICONE_CHAT
+} from "./comum.js";
 
 const $ = (id) => document.getElementById(id);
-const moeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const dados = JSON.parse($("dadosPagina").textContent || "{}");
+const config = dados.config || {};
+const app = $("app");
 
-let categorias = {};
-let produtos = {};
-let editando = null;       // produto aberto na janela
-let processando = 0;       // fotos sendo processadas
-const cacheMini = {};      // miniaturas da lista: { produtoId: dataURL }
+$("logoLoja").innerHTML = nomeLojaHTML(config.nomeLoja);
 
-// ---------- Utilidades ----------
+// ---------- Produto não encontrado ----------
 
-function el(tag, attrs = {}, ...filhos) {
-  const e = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (k === "class") e.className = v;
-    else if (k === "text") e.textContent = v;
-    else if (k.startsWith("on") && typeof v === "function") e.addEventListener(k.slice(2), v);
-    else if (v === true) e.setAttribute(k, "");
-    else if (v !== false && v != null) e.setAttribute(k, v);
-  }
-  filhos.flat().forEach((f) => f != null && e.append(f));
-  return e;
+if (dados.naoEncontrado) {
+  app.innerHTML = `
+    <div class="nao-encontrado">
+      <strong>Produto não encontrado</strong>
+      <p>Esse produto pode ter sido vendido ou removido. Veja os outros itens da vitrine.</p>
+      <a href="/" class="btn-principal">Ver todos os produtos</a>
+    </div>`;
+  $("btnCompartilhar").hidden = true;
+} else {
+  montarPagina();
 }
 
-function normalizar(txt) {
-  return String(txt || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+// ---------- Página ----------
+
+function montarPagina() {
+  const { id, produto: p } = dados;
+  const fotos = p.fotos || [];
+  const vendido = p.status === "vendido";
+  const reservado = p.status === "reservado";
+
+  let seloStatus = "";
+  if (vendido) seloStatus = `<span class="selo selo-vendido">Vendido</span>`;
+  else if (reservado) seloStatus = `<span class="selo selo-reservado">Reservado</span>`;
+  else seloStatus = `<span class="selo selo-disponivel">Disponível</span>`;
+
+  const galeria = fotos.length ? `
+    <div class="galeria">
+      <div class="galeria-trilho" id="galeriaTrilho">
+        ${fotos.map((f, i) => `
+          <div class="galeria-slide">
+            <img src="${urlFoto(id, f, "g")}" alt="${esc(p.titulo)} — foto ${i + 1}"
+              ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async">
+          </div>`).join("")}
+      </div>
+      ${fotos.length > 1 ? `
+        <button type="button" class="galeria-seta esquerda" id="setaEsq" aria-label="Foto anterior">‹</button>
+        <button type="button" class="galeria-seta direita" id="setaDir" aria-label="Próxima foto">›</button>
+        <span class="galeria-contador" id="galeriaContador">1 / ${fotos.length}</span>
+        <div class="galeria-pontos" id="galeriaPontos">
+          ${fotos.map((_, i) => `<span class="${i === 0 ? "ativo" : ""}"></span>`).join("")}
+        </div>` : ""}
+      ${vendido ? `<div class="galeria-faixa">VENDIDO</div>` : ""}
+    </div>` : `<div class="galeria galeria-vazia">Sem fotos</div>`;
+
+  const condicoes = [];
+  if (config.textoPagamento) condicoes.push(["Pagamento", config.textoPagamento]);
+  if (config.textoEntrega) condicoes.push(["Entrega", config.textoEntrega]);
+  if (config.localRetirada) condicoes.push(["Retirada", config.localRetirada]);
+  if (config.aceitaTroca) condicoes.push(["Troca", config.textoTroca || "Aceito propostas de troca"]);
+  if (config.horario) condicoes.push(["Atendimento", config.horario]);
+  if (config.regiao) condicoes.push(["Região", config.regiao]);
+
+  app.innerHTML = `
+    <div class="produto-layout">
+      <div class="produto-col-fotos">${galeria}</div>
+
+      <div class="produto-col-info">
+        <div class="produto-cabecalho">
+          <div class="produto-selos">
+            ${seloStatus}
+            <span class="produto-codigo">Cód. ${esc(p.codigo)}</span>
+          </div>
+          <h1 class="produto-titulo">${esc(p.titulo)}</h1>
+          <div class="produto-preco">${esc(formatarPreco(p.preco))}</div>
+          <div class="produto-estado">
+            <span class="estado-rotulo">Estado:</span> ${esc(ESTADOS[p.estado] || "Não informado")}
+          </div>
+        </div>
+
+        ${vendido ? `
+          <div class="aviso-status aviso-vendido">
+            Este produto já foi vendido. Veja abaixo outros produtos parecidos.
+          </div>` : reservado ? `
+          <div class="aviso-status aviso-reservado">
+            Este produto está reservado. Chame no WhatsApp para entrar na fila caso a venda não se concretize.
+          </div>` : ""}
+
+        <div id="fichaTecnica"></div>
+
+        ${p.descricao ? `
+          <section class="bloco">
+            <h2>Descrição</h2>
+            <p class="texto-longo">${esc(p.descricao)}</p>
+          </section>` : ""}
+
+        ${p.detalhes ? `
+          <section class="bloco bloco-detalhes">
+            <h2>Detalhes e defeitos</h2>
+            <p class="texto-longo">${esc(p.detalhes)}</p>
+          </section>` : ""}
+
+        ${condicoes.length ? `
+          <section class="bloco">
+            <h2>Condições</h2>
+            <dl class="lista-dados">
+              ${condicoes.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}
+            </dl>
+          </section>` : ""}
+      </div>
+    </div>
+
+    <section class="veja-tambem" id="vejaTambem" hidden>
+      <h2 class="titulo-secao">Veja também</h2>
+      <div class="grade" id="gradeRelacionados"></div>
+      <a href="/" class="btn-secundario-grande">Ver todos os produtos</a>
+    </section>
+
+    <div class="barra-compra">
+      <div class="barra-compra-inner">
+        <div class="barra-preco">
+          <span>${vendido ? "Vendido" : "Preço"}</span>
+          <strong>${esc(formatarPreco(p.preco))}</strong>
+        </div>
+        <a class="btn-whats" id="btnWhats" href="#" target="_blank" rel="noopener">
+          ${ICONE_CHAT}<span>${vendido ? "Pedir similar" : "Chamar no WhatsApp"}</span>
+        </a>
+      </div>
+    </div>`;
+
+  configurarWhatsapp(p, vendido);
+  configurarGaleria(fotos.length);
+  configurarCompartilhar(p);
+  contarVisualizacao(id);
+  carregarExtras(id, p);
 }
 
-export function formatarPreco(valor) {
-  if (valor === null || valor === undefined || valor === "") return "A combinar";
-  return moeda.format(Number(valor));
-}
+// ---------- WhatsApp ----------
 
-// Aceita "1.250,00", "1250", "1250.5", "R$ 99,90"
-function lerPreco(texto) {
-  let t = String(texto || "").replace(/[R$\s]/g, "");
-  if (!t) return NaN;
-  if (t.includes(",")) {
-    t = t.replace(/\./g, "").replace(",", ".");
-  } else if (/^\d{1,3}(\.\d{3})+$/.test(t)) {
-    t = t.replace(/\./g, "");
-  }
-  const n = Number(t);
-  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : NaN;
-}
+function configurarWhatsapp(p, vendido) {
+  const btn = $("btnWhats");
+  const texto = vendido
+    ? `Olá! Vi que o ${p.titulo} (cód. ${p.codigo}) já foi vendido. Você tem algo parecido?`
+    : mensagemProduto(config, p);
+  const link = linkWhatsapp(config, texto);
 
-function precoParaCampo(valor) {
-  if (valor === null || valor === undefined) return "";
-  return Number(valor).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function categoriasOrdenadas() {
-  return Object.entries(categorias)
-    .map(([id, c]) => ({ id, ...c }))
-    .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
-}
-
-// ---------- Lista ----------
-
-function produtosFiltrados() {
-  const busca = normalizar($("filtroBusca").value.trim());
-  const status = $("filtroStatus").value;
-  const cat = $("filtroCategoria").value;
-
-  return Object.entries(produtos)
-    .map(([id, p]) => ({ id, ...p }))
-    .filter((p) => !status || p.status === status)
-    .filter((p) => !cat || p.categoriaId === cat)
-    .filter((p) => {
-      if (!busca) return true;
-      return normalizar(`${p.titulo} ${p.codigo} ${p.descricao || ""}`).includes(busca);
-    })
-    .sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
-}
-
-function atualizarFiltroCategorias() {
-  const sel = $("filtroCategoria");
-  const atual = sel.value;
-  sel.innerHTML = "";
-  sel.append(el("option", { value: "" }, "Todas as categorias"));
-  categoriasOrdenadas().forEach((c) => sel.append(el("option", { value: c.id }, c.nome)));
-  sel.value = categorias[atual] ? atual : "";
-}
-
-function atualizarResumo() {
-  const lista = Object.values(produtos);
-  const cont = { disponivel: 0, reservado: 0, vendido: 0 };
-  lista.forEach((p) => { if (cont[p.status] !== undefined) cont[p.status]++; });
-  $("resumoProdutos").textContent =
-    `${lista.length} no total · ${cont.disponivel} disponíveis · ${cont.reservado} reservados · ${cont.vendido} vendidos`;
-}
-
-async function carregarMini(produto, imgEl) {
-  const capa = (produto.fotos || [])[0];
-  if (!capa) return;
-  const chave = produto.id + "/" + capa;
-  if (cacheMini[chave]) {
-    imgEl.src = cacheMini[chave];
+  if (!link) {
+    btn.hidden = true;
     return;
   }
-  try {
-    const snap = await get(ref(db, `fotos/${produto.id}/${capa}/t`));
-    if (snap.exists()) {
-      cacheMini[chave] = snap.val();
-      imgEl.src = snap.val();
-    }
-  } catch (err) {
-    console.error(err);
-  }
+  btn.href = link;
+  btn.addEventListener("click", () => registrarMetrica(dados.id, "cliquesWhats"));
 }
 
-function renderLista() {
-  const box = $("listaProdutos");
-  box.innerHTML = "";
-  atualizarResumo();
+// ---------- Galeria (arrastar para o lado) ----------
 
-  if (!Object.keys(produtos).length) {
-    box.append(el("div", { class: "cartao vazio" },
-      el("strong", { text: "Nenhum produto ainda" }),
-      Object.keys(categorias).length
-        ? "Clique em \"+ Novo produto\" para cadastrar o primeiro."
-        : "Antes, crie pelo menos uma categoria na aba Categorias."
-    ));
-    return;
-  }
+function configurarGaleria(total) {
+  if (total < 2) return;
+  const trilho = $("galeriaTrilho");
+  const pontos = $("galeriaPontos").children;
+  const contador = $("galeriaContador");
 
-  const itens = produtosFiltrados();
-  if (!itens.length) {
-    box.append(el("div", { class: "cartao vazio" },
-      el("strong", { text: "Nada encontrado" }),
-      "Nenhum produto com esses filtros."
-    ));
-    return;
-  }
+  const atual = () => Math.round(trilho.scrollLeft / trilho.clientWidth);
+  const irPara = (i) => {
+    const alvo = Math.max(0, Math.min(total - 1, i));
+    trilho.scrollTo({ left: alvo * trilho.clientWidth, behavior: "smooth" });
+  };
 
-  itens.forEach((p) => {
-    const img = el("img", { class: "prod-mini", alt: "", loading: "lazy" });
-    carregarMini(p, img);
-
-    const selStatus = el("select", { class: "sel-status status-" + p.status, "aria-label": "Status de " + p.titulo },
-      Object.entries(STATUS).map(([v, t]) => el("option", { value: v, selected: p.status === v }, t))
-    );
-    selStatus.addEventListener("change", () => mudarStatus(p.id, selStatus.value));
-
-    const nomeCat = categorias[p.categoriaId]?.nome || "Sem categoria";
-
-    box.append(el("div", { class: "cartao prod-card" },
-      el("div", { class: "prod-mini-box" }, img),
-      el("div", { class: "prod-info" },
-        el("div", { class: "prod-codigo", text: "Cód. " + p.codigo }),
-        el("div", { class: "prod-titulo", text: p.titulo }),
-        el("div", { class: "prod-meta", text: `${nomeCat} · ${formatarPreco(p.preco)}` })
-      ),
-      el("div", { class: "prod-acoes" },
-        selStatus,
-        el("button", { type: "button", class: "btn btn-secundario btn-pequeno", onclick: () => abrirEditor(p.id) }, "Editar"),
-        el("button", { type: "button", class: "btn btn-perigo btn-pequeno", onclick: () => excluir(p.id) }, "Excluir")
-      )
-    ));
-  });
-}
-
-async function mudarStatus(id, status) {
-  try {
-    await update(ref(db, "produtos/" + id), {
-      status,
-      vendidoEm: status === "vendido" ? Date.now() : null,
-      atualizadoEm: Date.now()
+  let quadro = null;
+  trilho.addEventListener("scroll", () => {
+    cancelAnimationFrame(quadro);
+    quadro = requestAnimationFrame(() => {
+      const i = atual();
+      contador.textContent = `${i + 1} / ${total}`;
+      Array.from(pontos).forEach((p, idx) => p.classList.toggle("ativo", idx === i));
+      $("setaEsq").disabled = i === 0;
+      $("setaDir").disabled = i === total - 1;
     });
-    toast(`Marcado como ${STATUS[status].toLowerCase()}.`);
-  } catch (err) {
-    console.error(err);
-    toast("Erro ao mudar o status.", "erro");
-  }
+  }, { passive: true });
+
+  $("setaEsq").disabled = true;
+  $("setaEsq").addEventListener("click", () => irPara(atual() - 1));
+  $("setaDir").addEventListener("click", () => irPara(atual() + 1));
 }
 
-async function excluir(id) {
-  const p = produtos[id];
-  if (!p) return;
-  if (!confirm(`Excluir "${p.titulo}" (cód. ${p.codigo})? As fotos também serão apagadas.`)) return;
-  try {
-    await update(ref(db), {
-      [`produtos/${id}`]: null,
-      [`fotos/${id}`]: null,
-      [`metricas/${id}`]: null
-    });
-    toast("Produto excluído.");
-  } catch (err) {
-    console.error(err);
-    toast("Erro ao excluir.", "erro");
-  }
-}
+// ---------- Compartilhar ----------
 
-// ---------- Editor ----------
-
-function preencherSelectCategorias(selecionada) {
-  const sel = $("prodCategoria");
-  sel.innerHTML = "";
-  sel.append(el("option", { value: "" }, "Selecione..."));
-  categoriasOrdenadas().forEach((c) => {
-    sel.append(el("option", { value: c.id, selected: c.id === selecionada },
-      c.ativa === false ? `${c.nome} (oculta)` : c.nome));
-  });
-}
-
-async function abrirEditor(id = null) {
-  if (!Object.keys(categorias).length) {
-    toast("Crie pelo menos uma categoria antes de cadastrar produtos.", "erro");
-    return;
-  }
-
-  if (id && produtos[id]) {
-    const p = produtos[id];
-    editando = {
-      id,
-      novo: false,
-      codigo: p.codigo,
-      criadoEm: p.criadoEm,
-      vendidoEm: p.vendidoEm || null,
-      campos: { ...(p.campos || {}) },
-      fotos: (p.fotos || []).map((fid) => ({ id: fid, t: null, nova: false })),
-      removidas: []
-    };
-    $("dlgProdTitulo").textContent = `Editar produto · Cód. ${p.codigo}`;
-    $("prodTitulo").value = p.titulo || "";
-    preencherSelectCategorias(p.categoriaId);
-    $("prodACombinar").checked = p.preco === null || p.preco === undefined;
-    $("prodPreco").value = precoParaCampo(p.preco);
-    $("prodEstado").value = p.estado || "";
-    $("prodStatus").value = p.status || "disponivel";
-    $("prodDescricao").value = p.descricao || "";
-    $("prodDetalhes").value = p.detalhes || "";
-    $("prodDestaque").checked = !!p.destaque;
-  } else {
-    editando = {
-      id: push(ref(db, "produtos")).key, // só gera o ID, não grava nada ainda
-      novo: true,
-      codigo: null,
-      criadoEm: null,
-      vendidoEm: null,
-      campos: {},
-      fotos: [],
-      removidas: []
-    };
-    $("dlgProdTitulo").textContent = "Novo produto";
-    $("formProduto").reset();
-    preencherSelectCategorias("");
-    $("prodStatus").value = "disponivel";
-  }
-
-  atualizarCampoPreco();
-  renderCamposCategoria();
-  renderFotos();
-  $("dlgProduto").showModal();
-  $("dlgProduto").querySelector(".janela-corpo").scrollTop = 0;
-
-  // Carrega as miniaturas das fotos já salvas
-  if (!editando.novo) {
-    const atual = editando;
-    await Promise.all(atual.fotos.map(async (f) => {
+function configurarCompartilhar(p) {
+  $("btnCompartilhar").addEventListener("click", async () => {
+    const url = `${location.origin}/p/${p.codigo}`;
+    const texto = `${p.titulo} — ${formatarPreco(p.preco)}`;
+    if (navigator.share) {
       try {
-        const snap = await get(ref(db, `fotos/${atual.id}/${f.id}/t`));
-        f.t = snap.val();
-      } catch (err) {
-        console.error(err);
+        await navigator.share({ title: p.titulo, text: texto, url });
+        return;
+      } catch (e) {
+        if (e && e.name === "AbortError") return;
       }
-    }));
-    if (editando === atual) renderFotos();
-  }
-}
-
-function fecharEditor() {
-  if (processando > 0 && !confirm("Ainda há fotos sendo processadas. Fechar mesmo assim?")) return;
-  $("dlgProduto").close();
-  editando = null;
-}
-
-function atualizarCampoPreco() {
-  const aCombinar = $("prodACombinar").checked;
-  $("prodPreco").disabled = aCombinar;
-  if (aCombinar) $("prodPreco").value = "";
-}
-
-// Campos personalizados da categoria escolhida
-function renderCamposCategoria() {
-  const box = $("camposCategoria");
-  box.innerHTML = "";
-  const cat = categorias[$("prodCategoria").value];
-  const campos = cat?.campos || [];
-
-  if (!cat) {
-    box.hidden = true;
-    return;
-  }
-  box.hidden = false;
-  box.append(el("h3", { text: "Ficha técnica — " + cat.nome }));
-
-  if (!campos.length) {
-    box.append(el("p", { class: "ajuda", text: "Essa categoria não tem campos extras." }));
-    return;
-  }
-
-  const grid = el("div", { class: "form-grid" });
-  campos.forEach((c) => {
-    const idInput = "pc_" + c.id;
-    const valor = editando.campos[c.id] ?? "";
-    let input;
-
-    if (c.tipo === "opcoes") {
-      input = el("select", { id: idInput },
-        el("option", { value: "" }, "—"),
-        (c.opcoes || []).map((o) => el("option", { value: o, selected: String(valor) === o }, o))
-      );
-    } else if (c.tipo === "simnao") {
-      input = el("select", { id: idInput },
-        el("option", { value: "" }, "—"),
-        el("option", { value: "Sim", selected: valor === "Sim" }, "Sim"),
-        el("option", { value: "Não", selected: valor === "Não" }, "Não")
-      );
-    } else if (c.tipo === "numero") {
-      input = el("input", { type: "text", inputmode: "decimal", id: idInput, value: String(valor) });
-    } else {
-      input = el("input", { type: "text", id: idInput, maxlength: "80", value: String(valor) });
     }
-
-    const atualizar = () => { editando.campos[c.id] = input.value.trim(); };
-    input.addEventListener("input", atualizar);
-    input.addEventListener("change", atualizar);
-
-    const rotulo = c.unidade ? `${c.rotulo} (${c.unidade})` : c.rotulo;
-    grid.append(el("div", { class: "campo" }, el("label", { for: idInput, text: rotulo }), input));
-  });
-  box.append(grid);
-}
-
-// ---------- Fotos ----------
-
-function renderFotos() {
-  const box = $("gradeFotos");
-  box.innerHTML = "";
-  const fotos = editando.fotos;
-
-  fotos.forEach((f, i) => {
-    box.append(el("div", { class: "foto-item" + (i === 0 ? " capa" : "") },
-      f.t ? el("img", { src: f.t, alt: "Foto " + (i + 1) }) : el("div", { class: "foto-carregando", text: "..." }),
-      i === 0 ? el("span", { class: "foto-selo", text: "Capa" }) : null,
-      el("div", { class: "foto-acoes" },
-        el("button", {
-          type: "button", class: "foto-btn", "aria-label": "Mover foto para a esquerda",
-          disabled: i === 0, onclick: () => moverFoto(i, -1)
-        }, "←"),
-        el("button", {
-          type: "button", class: "foto-btn", "aria-label": "Mover foto para a direita",
-          disabled: i === fotos.length - 1, onclick: () => moverFoto(i, 1)
-        }, "→"),
-        el("button", {
-          type: "button", class: "foto-btn foto-btn-perigo", "aria-label": "Remover foto",
-          onclick: () => removerFoto(i)
-        }, "✕")
-      )
-    ));
-  });
-
-  for (let i = 0; i < processando; i++) {
-    box.append(el("div", { class: "foto-item" }, el("div", { class: "foto-carregando", text: "Processando..." })));
-  }
-
-  if (fotos.length + processando < MAX_FOTOS) {
-    box.append(el("label", { class: "foto-add", for: "inputFotos" },
-      el("span", { class: "foto-add-mais", text: "+" }),
-      el("span", { text: `Adicionar fotos (${fotos.length}/${MAX_FOTOS})` })
-    ));
-  }
-}
-
-function moverFoto(i, direcao) {
-  const j = i + direcao;
-  const f = editando.fotos;
-  if (j < 0 || j >= f.length) return;
-  [f[i], f[j]] = [f[j], f[i]];
-  renderFotos();
-}
-
-function removerFoto(i) {
-  const [removida] = editando.fotos.splice(i, 1);
-  if (removida && !removida.nova) editando.removidas.push(removida.id);
-  renderFotos();
-}
-
-async function adicionarFotos(arquivos) {
-  const atual = editando;
-  const vagas = MAX_FOTOS - atual.fotos.length - processando;
-  const lista = Array.from(arquivos).slice(0, Math.max(0, vagas));
-  if (arquivos.length > lista.length) {
-    toast(`Máximo de ${MAX_FOTOS} fotos por produto.`, "erro");
-  }
-
-  for (const arq of lista) {
-    processando++;
-    renderFotos();
     try {
-      const { t, g } = await processarFoto(arq);
-      if (editando !== atual) continue;
-      atual.fotos.push({ id: push(ref(db, "fotos/" + atual.id)).key, t, g, nova: true });
-    } catch (err) {
-      console.error(err);
-      toast(`Não foi possível usar a imagem "${arq.name}". Use JPG ou PNG.`, "erro");
-    } finally {
-      processando--;
-      if (editando === atual) renderFotos();
+      await navigator.clipboard.writeText(url);
+      aviso("Link copiado!");
+    } catch (e) {
+      prompt("Copie o link do produto:", url);
     }
-  }
+  });
 }
 
-// ---------- Salvar ----------
+// ---------- Visualizações ----------
 
-async function salvar(e) {
-  e.preventDefault();
-  if (processando > 0) {
-    toast("Aguarde as fotos terminarem de processar.", "erro");
-    return;
-  }
-
-  const titulo = $("prodTitulo").value.trim();
-  const categoriaId = $("prodCategoria").value;
-  const estado = $("prodEstado").value;
-  const status = $("prodStatus").value;
-  const aCombinar = $("prodACombinar").checked;
-  const preco = aCombinar ? null : lerPreco($("prodPreco").value);
-
-  if (!editando.fotos.length) return toast("Adicione pelo menos 1 foto.", "erro");
-  if (!titulo) { $("prodTitulo").focus(); return toast("Informe o título do produto.", "erro"); }
-  if (!categoriaId) { $("prodCategoria").focus(); return toast("Escolha a categoria.", "erro"); }
-  if (!aCombinar && Number.isNaN(preco)) {
-    $("prodPreco").focus();
-    return toast("Preço inválido. Ex.: 250 ou 1.250,00 — ou marque \"A combinar\".", "erro");
-  }
-  if (!estado) { $("prodEstado").focus(); return toast("Informe o estado do produto.", "erro"); }
-
-  // Só guarda os campos da categoria atual que foram preenchidos
-  const campos = {};
-  (categorias[categoriaId]?.campos || []).forEach((c) => {
-    const v = String(editando.campos[c.id] ?? "").trim();
-    if (v) campos[c.id] = v;
-  });
-
-  const btn = $("btnSalvarProd");
-  carregandoBotao(btn, true, editando.fotos.some((f) => f.nova) ? "Enviando fotos..." : "Salvando...");
-
+function contarVisualizacao(id) {
+  const chave = "achei_v_" + id;
   try {
-    let codigo = editando.codigo;
-    if (editando.novo) {
-      const res = await runTransaction(ref(db, "contadores/produto"), (n) => (n || 0) + 1);
-      codigo = String(res.snapshot.val()).padStart(3, "0");
+    if (sessionStorage.getItem(chave)) return;
+    sessionStorage.setItem(chave, "1");
+  } catch (e) { /* navegação privada: conta mesmo assim */ }
+  registrarMetrica(id, "views");
+}
+
+// ---------- Ficha técnica e "Veja também" ----------
+
+async function carregarExtras(id, p) {
+  try {
+    const [categorias, produtos] = await Promise.all([lerDB("categorias"), lerDB("produtos")]);
+    const cat = categorias?.[p.categoriaId];
+
+    // Ficha técnica: segue a ordem dos campos da categoria
+    const linhas = (cat?.campos || [])
+      .map((c) => {
+        const v = p.campos?.[c.id];
+        if (v === undefined || v === null || v === "") return null;
+        const valor = c.tipo === "numero" && c.unidade ? `${v} ${c.unidade}` : v;
+        return `<div><dt>${esc(c.rotulo)}</dt><dd>${esc(valor)}</dd></div>`;
+      })
+      .filter(Boolean);
+
+    $("fichaTecnica").innerHTML = `
+      <section class="bloco">
+        <h2>Ficha técnica</h2>
+        <dl class="lista-dados">
+          ${cat ? `<div><dt>Categoria</dt><dd><a href="/?cat=${encodeURIComponent(cat.slug || "")}">${esc(cat.nome)}</a></dd></div>` : ""}
+          ${linhas.join("")}
+        </dl>
+      </section>`;
+
+    // Veja também: primeiro da mesma categoria, depois os mais recentes
+    const catsAtivas = new Set(Object.entries(categorias || {}).filter(([, c]) => c.ativa !== false).map(([cid]) => cid));
+    const outros = paraLista(produtos)
+      .filter((x) => x.id !== id && x.status === "disponivel" && catsAtivas.has(x.categoriaId))
+      .sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
+    const mesmaCat = outros.filter((x) => x.categoriaId === p.categoriaId);
+    const resto = outros.filter((x) => x.categoriaId !== p.categoriaId);
+    const relacionados = [...mesmaCat, ...resto].slice(0, 6);
+
+    if (relacionados.length) {
+      $("gradeRelacionados").innerHTML = relacionados.map(cardProduto).join("");
+      $("vejaTambem").hidden = false;
     }
-
-    const agora = Date.now();
-    const produto = {
-      codigo,
-      titulo,
-      categoriaId,
-      preco,
-      estado,
-      status,
-      campos,
-      descricao: $("prodDescricao").value.trim(),
-      detalhes: $("prodDetalhes").value.trim(),
-      destaque: $("prodDestaque").checked,
-      fotos: editando.fotos.map((f) => f.id),
-      criadoEm: editando.criadoEm || agora,
-      atualizadoEm: agora,
-      vendidoEm: status === "vendido" ? (editando.vendidoEm || agora) : null
-    };
-
-    const id = editando.id;
-    const mudancas = { [`produtos/${id}`]: produto };
-    editando.fotos.filter((f) => f.nova).forEach((f) => {
-      mudancas[`fotos/${id}/${f.id}`] = { t: f.t, g: f.g };
-    });
-    editando.removidas.forEach((fid) => {
-      mudancas[`fotos/${id}/${fid}`] = null;
-    });
-
-    await update(ref(db), mudancas);
-    toast(editando.novo ? `Produto cadastrado! Código ${codigo}` : "Produto atualizado!");
-    $("dlgProduto").close();
-    editando = null;
   } catch (err) {
     console.error(err);
-    toast("Erro ao salvar o produto. Tente novamente.", "erro");
-  } finally {
-    carregandoBotao(btn, false);
   }
-}
-
-// ---------- Início ----------
-
-export function iniciarProdutos() {
-  $("btnNovoProduto").addEventListener("click", () => abrirEditor());
-  $("btnFecharProd").addEventListener("click", fecharEditor);
-  $("btnCancelarProd").addEventListener("click", fecharEditor);
-  $("dlgProduto").addEventListener("cancel", (e) => { e.preventDefault(); fecharEditor(); });
-  $("formProduto").addEventListener("submit", salvar);
-  $("prodCategoria").addEventListener("change", renderCamposCategoria);
-  $("prodACombinar").addEventListener("change", atualizarCampoPreco);
-  $("prodPreco").addEventListener("blur", () => {
-    const v = lerPreco($("prodPreco").value);
-    if (!Number.isNaN(v)) $("prodPreco").value = precoParaCampo(v);
-  });
-  $("inputFotos").addEventListener("change", (e) => {
-    if (e.target.files?.length) adicionarFotos(e.target.files);
-    e.target.value = "";
-  });
-
-  ["filtroBusca", "filtroStatus", "filtroCategoria"].forEach((id) => {
-    $(id).addEventListener("input", renderLista);
-  });
-
-  onValue(ref(db, "categorias"), (snap) => {
-    categorias = snap.val() || {};
-    atualizarFiltroCategorias();
-    renderLista();
-  });
-
-  onValue(ref(db, "produtos"), (snap) => {
-    produtos = snap.val() || {};
-    renderLista();
-  }, (err) => {
-    console.error(err);
-    toast("Erro ao carregar produtos.", "erro");
-  });
 }
