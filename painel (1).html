@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Painel — Achei</title>
+  <link rel="stylesheet" href="../css/admin.css">
+</head>
+<body>
+  <!-- Tela exibida enquanto verifica o login -->
+  <div class="carregando" id="telaCarregando">Carregando painel...</div>
+
+  <div id="app" hidden>
+    <header class="painel-topo">
+      <div class="painel-topo-inner">
+        <div class="logo">achei<span>!</span></div>
+        <div class="usuario">
+          <span class="email" id="emailUsuario"></span>
+          <button type="button" class="btn-sair" id="btnSair">Sair</button>
+        </div>
+      </div>
+    </header>
+
+    <nav class="abas" aria-label="Seções do painel">
+      <div class="abas-inner">
+        <button type="button" class="aba ativa" data-aba="produtos">Produtos</button>
+        <button type="button" class="aba" data-aba="categorias">Categorias</button>
+        <button type="button" class="aba" data-aba="configuracoes">Configurações</button>
+      </div>
+    </nav>
+
+    <main class="conteudo">
+      <section class="secao ativa" id="secao-produtos">
+        <h1>Produtos</h1>
+        <div class="cartao">
+          <div class="vazio">
+            <strong>Nenhum produto ainda</strong>
+            O cadastro de produtos será liberado nas próximas etapas.
+          </div>
+        </div>
+      </section>
+
+      <section class="secao" id="secao-categorias">
+        <h1>Categorias</h1>
+        <div class="cartao">
+          <div class="vazio">
+            <strong>Nenhuma categoria ainda</strong>
+            O cadastro de categorias será liberado nas próximas etapas.
+          </div>
+        </div>
+      </section>
+
+      <section class="secao" id="secao-configuracoes">
+        <h1>Configurações da loja</h1>
+        <div class="cartao">
+          <div class="vazio">
+            <strong>Em breve</strong>
+            Nome da loja, WhatsApp e textos padrão serão configurados aqui.
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module">
+    import { auth, ADMIN_UID } from "../js/firebase.js";
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    const telaCarregando = document.getElementById("telaCarregando");
+    const app = document.getElementById("app");
+    const emailUsuario = document.getElementById("emailUsuario");
+
+    // Proteção: só o admin entra no painel
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.replace("index.html");
+        return;
+      }
+      if (user.uid !== ADMIN_UID) {
+        await signOut(auth);
+        window.location.replace("index.html");
+        return;
+      }
+      emailUsuario.textContent = user.email;
+      telaCarregando.hidden = true;
+      telaCarregando.style.display = "none";
+      app.hidden = false;
+    });
+
+    // Sair
+    document.getElementById("btnSair").addEventListener("click", async () => {
+      await signOut(auth);
+      window.location.replace("index.html");
+    });
+
+    // Troca de abas (lembra a última aba aberta)
+    const abas = document.querySelectorAll(".aba");
+    const secoes = document.querySelectorAll(".secao");
+
+    function abrirAba(nome) {
+      abas.forEach((a) => a.classList.toggle("ativa", a.dataset.aba === nome));
+      secoes.forEach((s) => s.classList.toggle("ativa", s.id === "secao-" + nome));
+      try { localStorage.setItem("achei_aba", nome); } catch (e) {}
+    }
+
+    abas.forEach((aba) => {
+      aba.addEventListener("click", () => abrirAba(aba.dataset.aba));
+    });
+
+    try {
+      const ultima = localStorage.getItem("achei_aba");
+      if (ultima && document.getElementById("secao-" + ultima)) abrirAba(ultima);
+    } catch (e) {}
+  </script>
+</body>
+</html>

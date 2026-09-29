@@ -1,0 +1,240 @@
+/* ===== Achei — estilos do painel admin ===== */
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap");
+
+:root {
+  --marinho: #1B2A4A;
+  --marinho-2: #2A3B5F;
+  --laranja: #D9480F;
+  --laranja-escuro: #A8380B;
+  --fundo: #F4F1EA;
+  --branco: #FFFFFF;
+  --texto: #1B2A4A;
+  --texto-2: #4A5568;
+  --borda: #E2DDD2;
+  --erro: #C92A2A;
+  --sucesso: #2B8A3E;
+  --raio: 14px;
+  --sombra: 0 2px 10px rgba(27, 42, 74, 0.08);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--fundo);
+  color: var(--texto);
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--laranja); }
+a:hover { color: var(--laranja-escuro); }
+
+.logo {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  color: var(--marinho);
+  line-height: 1;
+  text-decoration: none;
+}
+.logo span { color: var(--laranja); }
+
+/* ===== Botões ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s, opacity .15s;
+}
+.btn:disabled { opacity: .6; cursor: not-allowed; }
+.btn-primario { background: var(--laranja); color: #fff; }
+.btn-primario:hover:not(:disabled) { background: var(--laranja-escuro); }
+.btn-secundario { background: transparent; color: var(--marinho); border: 2px solid var(--borda); }
+.btn-secundario:hover:not(:disabled) { border-color: var(--marinho); }
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--laranja);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px 0;
+}
+.btn-link:hover { color: var(--laranja-escuro); text-decoration: underline; }
+.btn-bloco { width: 100%; }
+
+/* ===== Formulários ===== */
+.campo { display: flex; flex-direction: column; gap: 6px; }
+.campo label { font-size: 14px; font-weight: 600; color: var(--texto-2); }
+.campo input,
+.campo select,
+.campo textarea {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 2px solid var(--borda);
+  border-radius: 10px;
+  background: var(--branco);
+  color: var(--texto);
+  font-family: inherit;
+  font-size: 16px;
+}
+.campo input:focus,
+.campo select:focus,
+.campo textarea:focus { outline: none; border-color: var(--marinho); }
+
+.mensagem {
+  display: none;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.mensagem.erro { display: block; background: #FFF0F0; color: var(--erro); }
+.mensagem.sucesso { display: block; background: #EBFBEE; color: var(--sucesso); }
+
+/* ===== Tela de login ===== */
+.login-pagina {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+.login-caixa {
+  width: 100%;
+  max-width: 400px;
+  background: var(--branco);
+  border-radius: 20px;
+  box-shadow: var(--sombra);
+  padding: 36px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.login-topo { text-align: center; display: flex; flex-direction: column; gap: 8px; }
+.login-topo .logo { font-size: 56px; }
+.login-topo p { margin: 0; color: var(--texto-2); font-size: 15px; }
+.login-form { display: flex; flex-direction: column; gap: 16px; }
+
+/* ===== Painel ===== */
+.painel-topo {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--marinho);
+  color: #fff;
+  padding: 0 16px;
+}
+.painel-topo-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.painel-topo .logo { font-size: 32px; color: #fff; }
+.painel-topo .usuario {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: #C9D2E3;
+}
+.painel-topo .usuario .email { display: none; }
+.btn-sair {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.3);
+  background: transparent;
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-sair:hover { background: rgba(255,255,255,.1); }
+
+.abas {
+  background: var(--branco);
+  border-bottom: 1px solid var(--borda);
+  overflow-x: auto;
+}
+.abas-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  gap: 4px;
+  padding: 0 8px;
+}
+.aba {
+  flex-shrink: 0;
+  min-height: 52px;
+  padding: 0 16px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--texto-2);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.aba:hover { color: var(--marinho); }
+.aba.ativa { color: var(--marinho); border-bottom-color: var(--laranja); }
+
+.conteudo {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+.secao { display: none; }
+.secao.ativa { display: block; }
+.secao h1 {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-weight: 800;
+  font-size: 28px;
+  margin: 0 0 16px;
+}
+.cartao {
+  background: var(--branco);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  padding: 24px;
+}
+.vazio {
+  text-align: center;
+  color: var(--texto-2);
+  padding: 40px 16px;
+}
+.vazio strong { display: block; color: var(--marinho); font-size: 18px; margin-bottom: 6px; }
+
+.carregando {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--texto-2);
+  font-size: 15px;
+}
+
+@media (min-width: 700px) {
+  .painel-topo .usuario .email { display: inline; }
+  .conteudo { padding: 32px 24px 64px; }
+}

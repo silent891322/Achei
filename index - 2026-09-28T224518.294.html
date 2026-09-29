@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Entrar — Painel Achei</title>
+  <link rel="stylesheet" href="../css/admin.css">
+</head>
+<body>
+  <main class="login-pagina">
+    <div class="login-caixa">
+      <div class="login-topo">
+        <div class="logo">achei<span>!</span></div>
+        <p>Painel administrativo</p>
+      </div>
+
+      <form class="login-form" id="formLogin" novalidate>
+        <div class="campo">
+          <label for="email">E-mail</label>
+          <input type="email" id="email" autocomplete="email" required>
+        </div>
+        <div class="campo">
+          <label for="senha">Senha</label>
+          <input type="password" id="senha" autocomplete="current-password" required>
+        </div>
+
+        <div class="mensagem" id="mensagem" role="alert"></div>
+
+        <button type="submit" class="btn btn-primario btn-bloco" id="btnEntrar">Entrar</button>
+        <button type="button" class="btn-link" id="btnEsqueci">Esqueci minha senha</button>
+      </form>
+    </div>
+  </main>
+
+  <script type="module">
+    import { auth, ADMIN_UID } from "../js/firebase.js";
+    import {
+      signInWithEmailAndPassword,
+      sendPasswordResetEmail,
+      onAuthStateChanged,
+      signOut,
+      setPersistence,
+      browserLocalPersistence
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    const form = document.getElementById("formLogin");
+    const inputEmail = document.getElementById("email");
+    const inputSenha = document.getElementById("senha");
+    const btnEntrar = document.getElementById("btnEntrar");
+    const btnEsqueci = document.getElementById("btnEsqueci");
+    const mensagem = document.getElementById("mensagem");
+
+    function mostrarMensagem(texto, tipo) {
+      mensagem.textContent = texto;
+      mensagem.className = "mensagem " + tipo;
+    }
+    function limparMensagem() {
+      mensagem.textContent = "";
+      mensagem.className = "mensagem";
+    }
+
+    function traduzirErro(codigo) {
+      const erros = {
+        "auth/invalid-email": "E-mail inválido.",
+        "auth/missing-password": "Digite a senha.",
+        "auth/invalid-credential": "E-mail ou senha incorretos.",
+        "auth/wrong-password": "E-mail ou senha incorretos.",
+        "auth/user-not-found": "E-mail ou senha incorretos.",
+        "auth/user-disabled": "Este usuário está desativado.",
+        "auth/too-many-requests": "Muitas tentativas. Aguarde alguns minutos e tente de novo.",
+        "auth/network-request-failed": "Sem conexão. Verifique sua internet."
+      };
+      return erros[codigo] || "Não foi possível entrar. Tente novamente.";
+    }
+
+    // Se já estiver logado como admin, vai direto para o painel
+    onAuthStateChanged(auth, (user) => {
+      if (user && user.uid === ADMIN_UID) {
+        window.location.replace("painel.html");
+      }
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      limparMensagem();
+
+      const email = inputEmail.value.trim();
+      const senha = inputSenha.value;
+
+      if (!email || !senha) {
+        mostrarMensagem("Preencha e-mail e senha.", "erro");
+        return;
+      }
+
+      btnEntrar.disabled = true;
+      btnEntrar.textContent = "Entrando...";
+
+      try {
+        await setPersistence(auth, browserLocalPersistence);
+        const cred = await signInWithEmailAndPassword(auth, email, senha);
+
+        if (cred.user.uid !== ADMIN_UID) {
+          await signOut(auth);
+          mostrarMensagem("Este usuário não tem acesso ao painel.", "erro");
+          return;
+        }
+
+        window.location.replace("painel.html");
+      } catch (err) {
+        mostrarMensagem(traduzirErro(err.code), "erro");
+      } finally {
+        btnEntrar.disabled = false;
+        btnEntrar.textContent = "Entrar";
+      }
+    });
+
+    btnEsqueci.addEventListener("click", async () => {
+      limparMensagem();
+      const email = inputEmail.value.trim();
+      if (!email) {
+        mostrarMensagem("Digite seu e-mail no campo acima e clique de novo em \"Esqueci minha senha\".", "erro");
+        inputEmail.focus();
+        return;
+      }
+      try {
+        await sendPasswordResetEmail(auth, email);
+        mostrarMensagem("Se esse e-mail estiver cadastrado, enviamos um link para criar uma nova senha.", "sucesso");
+      } catch (err) {
+        mostrarMensagem(traduzirErro(err.code), "erro");
+      }
+    });
+  </script>
+</body>
+</html>
