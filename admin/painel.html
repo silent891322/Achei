@@ -44,13 +44,62 @@
 
       <!-- ===== CATEGORIAS ===== -->
       <section class="secao" id="secao-categorias">
-        <h1>Categorias</h1>
-        <div class="cartao">
-          <div class="vazio">
-            <strong>Nenhuma categoria ainda</strong>
-            O cadastro de categorias será liberado nas próximas etapas.
-          </div>
+        <div class="secao-topo">
+          <h1>Categorias</h1>
+          <button type="button" class="btn btn-primario" id="btnNovaCategoria">+ Nova categoria</button>
         </div>
+        <p class="ajuda secao-ajuda">A ordem aqui é a mesma que aparece na vitrine. Use as setas para reorganizar.</p>
+        <div class="lista-categorias" id="listaCategorias">
+          <div class="cartao vazio">Carregando...</div>
+        </div>
+
+        <!-- Janela de criar/editar categoria -->
+        <dialog class="janela" id="dlgCategoria" aria-labelledby="dlgCatTitulo">
+          <form id="formCategoria" class="janela-form" novalidate>
+            <div class="janela-topo">
+              <h2 id="dlgCatTitulo">Nova categoria</h2>
+              <button type="button" class="btn-icone" id="btnFecharCat" aria-label="Fechar">✕</button>
+            </div>
+
+            <div class="janela-corpo">
+              <div class="campo" id="grupoModelo">
+                <label for="catModelo">Começar de um modelo pronto (opcional)</label>
+                <select id="catModelo">
+                  <option value="">Em branco</option>
+                  <option value="rodas">Rodas e Pneus</option>
+                  <option value="piscina">Piscina</option>
+                  <option value="decoracao">Quadros e Decoração</option>
+                  <option value="eletronicos">Eletrônicos</option>
+                  <option value="moveis">Móveis</option>
+                </select>
+              </div>
+
+              <div class="campo">
+                <label for="catNome">Nome da categoria *</label>
+                <input type="text" id="catNome" maxlength="40" placeholder="Ex.: Rodas e Pneus" required>
+              </div>
+
+              <label class="checkbox">
+                <input type="checkbox" id="catAtiva" checked>
+                <span>Mostrar na vitrine</span>
+              </label>
+
+              <div class="campos-extras">
+                <div class="campos-extras-topo">
+                  <h3>Campos personalizados</h3>
+                  <span class="ajuda">Informações específicas dessa categoria, que aparecem como ficha técnica do produto.</span>
+                </div>
+                <div id="listaCampos"></div>
+                <button type="button" class="btn btn-secundario btn-bloco" id="btnAddCampo">+ Adicionar campo</button>
+              </div>
+            </div>
+
+            <div class="janela-rodape">
+              <button type="button" class="btn btn-secundario" id="btnCancelarCat">Cancelar</button>
+              <button type="submit" class="btn btn-primario" id="btnSalvarCat">Salvar categoria</button>
+            </div>
+          </form>
+        </dialog>
       </section>
 
       <!-- ===== CONFIGURAÇÕES ===== -->
@@ -154,6 +203,7 @@
     import { auth, ADMIN_UID } from "../js/firebase.js";
     import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { iniciarConfiguracoes } from "../js/admin/configuracoes.js";
+    import { iniciarCategorias } from "../js/admin/categorias.js";
 
     const telaCarregando = document.getElementById("telaCarregando");
     const app = document.getElementById("app");
@@ -178,6 +228,7 @@
       if (!iniciado) {
         iniciado = true;
         iniciarConfiguracoes();
+        iniciarCategorias();
       }
     });
 
