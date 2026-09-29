@@ -33,13 +33,118 @@
     <main class="conteudo">
       <!-- ===== PRODUTOS ===== -->
       <section class="secao ativa" id="secao-produtos">
-        <h1>Produtos</h1>
-        <div class="cartao">
-          <div class="vazio">
-            <strong>Nenhum produto ainda</strong>
-            O cadastro de produtos será liberado nas próximas etapas.
+        <div class="secao-topo">
+          <h1>Produtos</h1>
+          <button type="button" class="btn btn-primario" id="btnNovoProduto">+ Novo produto</button>
+        </div>
+        <p class="ajuda secao-ajuda" id="resumoProdutos"></p>
+
+        <div class="filtros">
+          <div class="campo">
+            <label for="filtroBusca">Buscar</label>
+            <input type="search" id="filtroBusca" placeholder="Título ou código">
+          </div>
+          <div class="campo">
+            <label for="filtroStatus">Status</label>
+            <select id="filtroStatus">
+              <option value="">Todos</option>
+              <option value="disponivel">Disponível</option>
+              <option value="reservado">Reservado</option>
+              <option value="vendido">Vendido</option>
+            </select>
+          </div>
+          <div class="campo">
+            <label for="filtroCategoria">Categoria</label>
+            <select id="filtroCategoria">
+              <option value="">Todas as categorias</option>
+            </select>
           </div>
         </div>
+
+        <div class="lista-produtos" id="listaProdutos">
+          <div class="cartao vazio">Carregando...</div>
+        </div>
+
+        <!-- Janela de cadastrar/editar produto -->
+        <dialog class="janela janela-grande" id="dlgProduto" aria-labelledby="dlgProdTitulo">
+          <form id="formProduto" class="janela-form" novalidate>
+            <div class="janela-topo">
+              <h2 id="dlgProdTitulo">Novo produto</h2>
+              <button type="button" class="btn-icone" id="btnFecharProd" aria-label="Fechar">✕</button>
+            </div>
+
+            <div class="janela-corpo">
+              <div class="bloco-fotos">
+                <h3>Fotos *</h3>
+                <span class="ajuda">A primeira foto é a capa. Use as setas para mudar a ordem. Até 10 fotos.</span>
+                <div class="grade-fotos" id="gradeFotos"></div>
+                <input type="file" id="inputFotos" accept="image/*" multiple hidden>
+              </div>
+
+              <div class="campo">
+                <label for="prodTitulo">Título do anúncio *</label>
+                <input type="text" id="prodTitulo" maxlength="80" placeholder="Ex.: Roda aro 15 original Gol com pneus">
+              </div>
+
+              <div class="form-grid">
+                <div class="campo">
+                  <label for="prodCategoria">Categoria *</label>
+                  <select id="prodCategoria"></select>
+                </div>
+                <div class="campo">
+                  <label for="prodEstado">Estado *</label>
+                  <select id="prodEstado">
+                    <option value="">Selecione...</option>
+                    <option value="novo">Novo (nunca usado)</option>
+                    <option value="seminovo">Seminovo</option>
+                    <option value="bom">Usado — bom estado</option>
+                    <option value="marcas">Usado — com marcas de uso</option>
+                    <option value="pecas">Com defeito / para peças</option>
+                  </select>
+                </div>
+                <div class="campo">
+                  <label for="prodPreco">Preço (R$) *</label>
+                  <input type="text" id="prodPreco" inputmode="decimal" placeholder="Ex.: 250,00">
+                  <label class="checkbox checkbox-pequeno">
+                    <input type="checkbox" id="prodACombinar">
+                    <span>Preço a combinar</span>
+                  </label>
+                </div>
+                <div class="campo">
+                  <label for="prodStatus">Status</label>
+                  <select id="prodStatus">
+                    <option value="disponivel">Disponível</option>
+                    <option value="reservado">Reservado</option>
+                    <option value="vendido">Vendido</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="campos-categoria" id="camposCategoria" hidden></div>
+
+              <div class="campo">
+                <label for="prodDescricao">Descrição</label>
+                <textarea id="prodDescricao" rows="4" maxlength="2000" placeholder="Conte sobre o produto: tempo de uso, motivo da venda, o que acompanha..."></textarea>
+              </div>
+
+              <div class="campo">
+                <label for="prodDetalhes">Detalhes e defeitos</label>
+                <textarea id="prodDetalhes" rows="3" maxlength="1000" placeholder="Ex.: Pequeno risco na lateral, funciona perfeitamente."></textarea>
+                <span class="ajuda">Seja transparente: isso evita desistência e discussão na hora da venda.</span>
+              </div>
+
+              <label class="checkbox">
+                <input type="checkbox" id="prodDestaque">
+                <span>Destacar na vitrine</span>
+              </label>
+            </div>
+
+            <div class="janela-rodape">
+              <button type="button" class="btn btn-secundario" id="btnCancelarProd">Cancelar</button>
+              <button type="submit" class="btn btn-primario" id="btnSalvarProd">Salvar produto</button>
+            </div>
+          </form>
+        </dialog>
       </section>
 
       <!-- ===== CATEGORIAS ===== -->
@@ -204,6 +309,7 @@
     import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { iniciarConfiguracoes } from "../js/admin/configuracoes.js";
     import { iniciarCategorias } from "../js/admin/categorias.js";
+    import { iniciarProdutos } from "../js/admin/produtos.js";
 
     const telaCarregando = document.getElementById("telaCarregando");
     const app = document.getElementById("app");
@@ -229,6 +335,7 @@
         iniciado = true;
         iniciarConfiguracoes();
         iniciarCategorias();
+        iniciarProdutos();
       }
     });
 
