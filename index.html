@@ -2,17 +2,70 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Achei! — Usados & Oportunidades</title>
-  <link rel="stylesheet" href="css/admin.css">
+  <meta name="description" content="Produtos usados e oportunidades com fotos, preço e contato direto pelo WhatsApp.">
+  <meta name="theme-color" content="#1B2A4A">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Achei! — Usados & Oportunidades">
+  <meta property="og:description" content="Veja todos os produtos com fotos, preço e contato direto pelo WhatsApp.">
+  <link rel="stylesheet" href="/css/vitrine.css">
 </head>
 <body>
-  <main class="login-pagina">
-    <div class="login-caixa" style="text-align:center">
-      <div class="logo" style="font-size:64px">achei<span>!</span></div>
-      <p style="margin:0;color:var(--texto-2);letter-spacing:4px;font-size:13px">USADOS &amp; OPORTUNIDADES</p>
-      <p style="margin:8px 0 0">Nossa vitrine está sendo preparada. Volte em breve!</p>
+  <header class="topo">
+    <div class="topo-inner">
+      <a href="/" class="marca">
+        <span class="logo" id="logoLoja">Achei<span>!</span></span>
+        <span class="slogan" id="sloganLoja">Usados &amp; Oportunidades</span>
+      </a>
     </div>
+    <div class="busca-box">
+      <label for="busca" class="visualmente-oculto">Buscar produtos</label>
+      <svg class="busca-icone" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" id="busca" placeholder="O que você procura?" autocomplete="off" enterkeyhint="search">
+    </div>
+  </header>
+
+  <nav class="cats" aria-label="Categorias">
+    <div class="cats-trilho" id="cats"></div>
+  </nav>
+
+  <main class="container">
+    <section class="secao-destaques" id="secDestaques" hidden>
+      <h2 class="titulo-secao">Destaques</h2>
+      <div class="trilho" id="destaques"></div>
+    </section>
+
+    <section>
+      <div class="lista-topo">
+        <h2 class="titulo-secao" id="tituloLista">Todos os produtos</h2>
+        <label for="ordem" class="visualmente-oculto">Ordenar</label>
+        <select id="ordem" class="sel-ordem">
+          <option value="recentes">Mais recentes</option>
+          <option value="menor">Menor preço</option>
+          <option value="maior">Maior preço</option>
+        </select>
+      </div>
+      <div class="filtros-campos" id="filtrosCampos" hidden></div>
+      <p class="contador" id="contador"></p>
+      <div class="grade" id="grade">
+        <div class="card card-esqueleto"></div>
+        <div class="card card-esqueleto"></div>
+        <div class="card card-esqueleto"></div>
+        <div class="card card-esqueleto"></div>
+      </div>
+    </section>
+
+    <section class="secao-vendidos" id="secVendidos" hidden>
+      <h2 class="titulo-secao">Vendidos recentemente</h2>
+      <div class="grade" id="vendidos"></div>
+    </section>
   </main>
+
+  <footer class="rodape" id="rodape"></footer>
+
+  <a class="whats-flutuante" id="whatsFlutuante" href="#" target="_blank" rel="noopener" hidden aria-label="Falar no WhatsApp"></a>
+
+  <script type="module" src="/js/vitrine/home.js"></script>
 </body>
 </html>
